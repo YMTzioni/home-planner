@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>הבית שלנו - תכנון ועיצוב</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:"Segoe UI",Arial,sans-serif;font-size:13px;color:#222;background:#eef1f4}
+  #app{display:flex;flex-direction:column;height:100%}
+  #bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:#fff;border-bottom:1px solid #d5dae0}
+  #bar h1{font-size:15px;margin:0 0 0 8px}
+  .grp{display:flex;gap:3px;align-items:center;padding:0 6px;border-inline-start:1px solid #e1e5ea}
+  button,select,input{font:inherit}
+  button{padding:5px 9px;border:1px solid #c3c9d1;border-radius:6px;background:#f6f7f9;cursor:pointer}
+  button:hover{background:#e6eefb}
+  button.on{background:#1e6fd0;color:#fff;border-color:#1e6fd0}
+  button.pri{background:#1c7c43;color:#fff;border-color:#1c7c43;font-weight:600}
+  button.danger{background:#fbe9e7;border-color:#e3a59c;color:#a3261a}
+  select,input[type=number],input[type=text],input:not([type]){padding:4px 6px;border:1px solid #c3c9d1;border-radius:6px;background:#fff}
+  #len{width:70px}
+  #main{flex:1;display:flex;min-height:0}
+  #ed{flex:1 1 50%;display:flex;flex-direction:column;min-width:0;border-inline-end:1px solid #d5dae0;background:#fff}
+  #main,#ed,#view3d{overflow:hidden}
+  #plan{flex:1 1 0;height:0;min-height:0;width:100%;background:#f7f9fb;touch-action:none;user-select:none}
+  #props{padding:8px 10px;border-top:1px solid #d5dae0;min-height:74px;max-height:210px;overflow:auto;background:#fff}
+  #props .row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;margin-top:6px}
+  #props label{display:flex;flex-direction:column;font-size:11px;color:#666;gap:2px}
+  #props input[type=number]{width:74px} #props input[list]{width:150px}
+  .hint{color:#777;font-size:12px;line-height:1.5} .warn{color:#a35a00;font-size:12px;margin-top:4px}
+  .ops{margin-top:6px;border-top:1px dashed #ddd} .ops .row span{min-width:74px;font-weight:600}
+  #view3d{flex:1 1 50%;position:relative;min-width:0}
+  #view3d canvas{display:block}
+  #v3{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.92);border-radius:10px;padding:7px 10px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+  #v3 label{display:block;margin:2px 0;cursor:pointer}
+  #v3 .b{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:5px} #v3 button{padding:3px 6px;font-size:12px}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:8px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
+  #sheets{position:fixed;inset:0;background:#5b6068;overflow:auto;z-index:20}
+  #sheets[hidden]{display:none}
+  #sheetBar{position:sticky;top:0;background:#fff;padding:8px 12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #ccc;z-index:2}
+  .sheet{width:210mm;min-height:296mm;background:#fff;margin:12px auto;padding:10mm;box-shadow:0 3px 14px rgba(0,0,0,.35);display:flex;flex-direction:column}
+  .sheet .plan{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;direction:ltr}
+  .sheet svg text{font-family:"Segoe UI",Arial,sans-serif}
+  .lg{display:flex;gap:14px;margin-top:4mm;font-size:10px;direction:rtl} .lg i{display:inline-block;width:18px;height:6px;margin-inline-end:4px;vertical-align:middle}
+  .tb{width:100%;border-collapse:collapse;font-size:10px;margin-top:3mm} .tb td{border:1px solid #333;padding:3px 6px}
+  .tb .tt{font-size:15px;font-weight:700;width:38%} .tb .tt small{display:block;font-size:9.5px;font-weight:400;color:#555}
+  .disc{font-size:8.5px;color:#666;margin-top:2mm;line-height:1.4}
+  .sheet h2{margin:0 0 4mm;font-size:17px} .sheet h3{margin:5mm 0 1.5mm;font-size:12.5px}
+  .sc{width:100%;border-collapse:collapse;font-size:10px;direction:rtl} .sc th,.sc td{border:1px solid #999;padding:2px 5px;text-align:center} .sc th{background:#eee} .sc .sum td{font-weight:700;background:#f6f6f6}
+  .none{color:#888;font-size:11px;margin:0} .sheet ul{font-size:11px;margin:0;padding-inline-start:18px;line-height:1.6}
+  @media (max-width:900px){ #main{flex-direction:column-reverse} #ed{border-inline-end:0;border-top:1px solid #d5dae0;flex-basis:58%} #view3d{flex-basis:42%} }
+  @page{size:A4 portrait;margin:0}
+  @media print{
+    html,body{height:auto;overflow:visible;background:#fff}
+    #app,#toast,#sheetBar{display:none!important}
+    #sheets{position:static;background:#fff;overflow:visible}
+    .sheet{margin:0;box-shadow:none;page-break-after:always;height:296mm}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <h1>הבית שלנו · תכנון</h1>
+    <div class="grp"><button data-floor="0">קרקע</button><button data-floor="1">קומה א׳</button></div>
+    <div class="grp">
+      <button data-tool="select" title="בחירה / הזזה">בחירה</button>
+      <button data-tool="wall" title="בניית קיר חדש">קיר +</button>
+      <select id="wk" title="סוג קיר חדש"><option value="int">מחיצה 10</option><option value="wall">קיר 20</option><option value="ext">קיר חיצוני 20</option><option value="low">קיר נמוך / גדר</option></select>
+      <input id="len" type="number" placeholder='אורך ס"מ' title="בזמן שרטוט קיר: הקלידו אורך ולחצו Enter">
+    </div>
+    <div class="grp">
+      <button data-tool="door">דלת</button><button data-tool="win">חלון</button><button data-tool="slide">ויטרינה</button><button data-tool="open">פתח</button><button data-tool="cut" title="חיתוך קיר לשניים - להריסה חלקית">חיתוך</button>
+    </div>
+    <div class="grp"><select id="addItem"></select><button id="addRoom">+ ייעוד חדר</button></div>
+    <div class="grp"><button id="undo" title="Ctrl+Z">↶</button><button id="redo" title="Ctrl+Y">↷</button><label><input type="checkbox" id="cDims" checked> מידות</label></div>
+    <div class="grp"><button id="mkSheets" class="pri">תוכניות עבודה</button><button id="save">שמירה</button><button id="loadBtn">טעינה</button><button id="reset">איפוס</button><input type="file" id="loadFile" accept=".json" hidden></div>
+  </div>
+  <div id="main">
+    <section id="ed"><svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg><div id="props"></div></section>
+    <section id="view3d">
+      <div id="v3">
+        <label><input type="checkbox" id="cRoof" checked> גג</label>
+        <label><input type="checkbox" id="cUpper" checked> קומה א׳</label>
+        <label><input type="checkbox" id="cLabels" checked> שמות חדרים</label>
+        <label><input type="checkbox" id="cSite" checked> מגרש</label>
+        <label><input type="checkbox" id="cHL" checked> הדגשת שינויים</label>
+        <div class="b"><button data-v="se">גינה</button><button data-v="n">רחוב</button><button data-v="e">מזרח</button><button data-v="top">על</button><button data-v="g">פנים קרקע</button><button data-v="u">פנים א׳</button></div>
+      </div>
+    </section>
+  </div>
+</div>
+<datalist id="roomList"></datalist>
+<div id="toast"></div>
+<div id="sheets" hidden>
+  <div id="sheetBar"><button id="printSheets" class="pri">הדפסה / שמירה כ-PDF</button><button id="closeSheets">חזרה לעורך</button><span class="hint">7 גיליונות A4: קיים, הריסה ובנייה, מוצע - לכל קומה, וכתב כמויות.</span></div>
+  <div id="sheetBody"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

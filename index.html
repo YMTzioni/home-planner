@@ -24,6 +24,11 @@
   #ed{flex:1 1 50%;display:flex;flex-direction:column;min-width:0;border-inline-end:1px solid #d5dae0;background:#fff}
   #main,#ed,#view3d{overflow:hidden}
   #plan{flex:1 1 0;height:0;min-height:0;width:100%;background:#f7f9fb;touch-action:none;user-select:none}
+  #layers{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 8px;border-bottom:1px solid #e1e5ea;background:#fafbfc;font-size:12px}
+  .ly{display:inline-flex;align-items:center;gap:1px;border:1px solid #d5dae0;border-radius:6px;padding:0 2px 0 6px;background:#fff}
+  .ly.hid>span{text-decoration:line-through;color:#999}
+  .ly button{padding:1px 3px;border:0;background:none;font-size:13px;opacity:.28;filter:grayscale(1)}
+  .ly button.on{background:none;opacity:1;filter:none}
   #props{padding:8px 10px;border-top:1px solid #d5dae0;min-height:74px;max-height:210px;overflow:auto;background:#fff}
   #props .row{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;margin-top:6px}
   #props label{display:flex;flex-direction:column;font-size:11px;color:#666;gap:2px}
@@ -76,10 +81,10 @@
     </div>
     <div class="grp"><select id="addItem"></select><button id="addRoom">+ ייעוד חדר</button></div>
     <div class="grp"><button id="undo" title="Ctrl+Z">↶</button><button id="redo" title="Ctrl+Y">↷</button><label><input type="checkbox" id="cDims" checked> מידות</label></div>
-    <div class="grp"><button id="mkSheets" class="pri">תוכניות עבודה</button><button id="save">שמירה</button><button id="loadBtn">טעינה</button><button id="reset">איפוס</button><input type="file" id="loadFile" accept=".json" hidden></div>
+    <div class="grp"><button id="mkSheets" class="pri">תוכניות עבודה</button><select id="vers" title="אבות טיפוס וגרסאות שמורות"></select><button id="save">שמירה</button><button id="loadBtn">טעינה</button><button id="reset">איפוס</button><input type="file" id="loadFile" accept=".json" hidden></div>
   </div>
   <div id="main">
-    <section id="ed"><svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg><div id="props"></div></section>
+    <section id="ed"><div id="layers"></div><svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg><div id="props"></div></section>
     <section id="view3d">
       <div id="v3">
         <label><input type="checkbox" id="cRoof" checked> גג</label>
@@ -95,11 +100,12 @@
 <datalist id="roomList"></datalist>
 <div id="toast"></div>
 <div id="sheets" hidden>
-  <div id="sheetBar"><button id="printSheets" class="pri">הדפסה / שמירה כ-PDF</button><button id="closeSheets">חזרה לעורך</button><span class="hint">7 גיליונות A4: קיים, הריסה ובנייה, מוצע - לכל קומה, וכתב כמויות.</span></div>
+  <div id="sheetBar"><button id="printSheets" class="pri">הדפסה / שמירה כ-PDF</button><button id="closeSheets">חזרה לעורך</button><span class="hint">8 גיליונות A4: קיים, הריסה ובנייה, מוצע - לכל קומה, טבלת שטחים וכתב כמויות.</span></div>
   <div id="sheetBody"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="prototypes.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

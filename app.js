@@ -268,10 +268,14 @@ function roomAreas(St, f, rooms) {
 // external stairs: I = straight, L = quarter turn, U = half turn (landing at the turn). Local coords: climb starts at y = -d/2.
 function stairGeo(it) {
   const hw = it.w / 2, hd = it.d / 2, z0 = -0.2, Ht = (it.h || L1) - z0, n = Math.max(4, Math.ceil(Ht / 0.175 - 1e-6)), rise = Ht / n;
-  const sh = it.shape || 'I', sw = sh === 'I' ? it.w : Math.max(.6, Math.min(it.sw || 1, sh === 'U' ? it.w / 2 : it.w - .3, it.d - .3));
+  const sh = it.shape || 'I', sw = sh === 'I' || sh === 'P' ? it.w : Math.max(.6, Math.min(it.sw || 1, sh === 'U' ? it.w / 2 : it.w - .3, it.d - .3));
   const fl = [], ld = []; let path;
   if (sh === 'I') { fl.push({ x0: -hw, x1: hw, y0: -hd, y1: hd, ax: 'y', dir: 1, n, k0: 0 }); path = [[0, -hd + .2], [0, hd - .25]]; }
-  else if (sh === 'L') {
+  else if (sh === 'P') {
+    const n1 = Math.floor((n - 1) / 2), lp = Math.max(.6, Math.min(it.lp || 1, it.d - 1.5)), go = (it.d - lp) / (n - 1), ya = -hd + n1 * go;
+    fl.push({ x0: -hw, x1: hw, y0: -hd, y1: ya, ax: 'y', dir: 1, n: n1, k0: 0 }); ld.push({ x0: -hw, x1: hw, y0: ya, y1: ya + lp, k: n1, mid: 1 });
+    fl.push({ x0: -hw, x1: hw, y0: ya + lp, y1: hd, ax: 'y', dir: 1, n: n - 1 - n1, k0: n1 + 1 }); path = [[0, -hd + .2], [0, hd - .25]];
+  } else if (sh === 'L') {
     const a = it.d - sw, b = it.w - sw, n1 = Math.max(1, Math.min(n - 2, Math.round((n - 1) * a / (a + b))));
     fl.push({ x0: -hw, x1: -hw + sw, y0: -hd, y1: hd - sw, ax: 'y', dir: 1, n: n1, k0: 0 }); ld.push({ x0: -hw, x1: -hw + sw, y0: hd - sw, y1: hd, k: n1 });
     fl.push({ x0: -hw + sw, x1: hw, y0: hd - sw, y1: hd, ax: 'x', dir: 1, n: n - 1 - n1, k0: n1 + 1 });
@@ -282,12 +286,28 @@ function stairGeo(it) {
     fl.push({ x0: hw - sw, x1: hw, y0: -hd, y1: hd - sw, ax: 'y', dir: -1, n: n - 1 - n1, k0: n1 + 1 });
     path = [[-hw + sw / 2, -hd + .2], [-hw + sw / 2, hd - sw / 2], [hw - sw / 2, hd - sw / 2], [hw - sw / 2, -hd + .25]];
   }
-  if (it.turn === 'l' && sh !== 'I') {
+  if (it.turn === 'l' && (sh === 'L' || sh === 'U')) {
     fl.concat(ld).forEach(q => { const t = q.x0; q.x0 = -q.x1; q.x1 = -t; if (q.ax === 'x') q.dir = -q.dir; }); path.forEach(p => p[0] = -p[0]);
   }
   fl.forEach(q => q.go = (q.ax === 'y' ? q.y1 - q.y0 : q.x1 - q.x0) / q.n);
   return { fl, ld, path, n, rise, z0, sh, sw, hw, hd };
 }
+// openings in a balcony railing: made automatically where the top of an external stair meets a railed edge
+// (sides in the balcony's local coords: l = -x, f = +y, r = +x; the -y side faces the house and has no railing)
+function railGaps(St, it) {
+  const out = { l: [], f: [], r: [] }, hw = it.w / 2, hd = it.d / 2, rb = -(it.rot || 0) * Math.PI / 180, cb = Math.cos(rb), sb = Math.sin(rb);
+  if (!it.f) return out;
+  St.items.filter(q => q.type === 'stairsExt' && q.st !== 'demo' && (q.h || L1) > 2.5).forEach(q => {
+    const G = stairGeo(q), e = G.fl[G.fl.length - 1], ra = (q.rot || 0) * Math.PI / 180, ca = Math.cos(ra), sa = Math.sin(ra);
+    const m = e.ax === 'y' ? [(e.x0 + e.x1) / 2, e.dir > 0 ? e.y1 : e.y0] : [e.dir > 0 ? e.x1 : e.x0, (e.y0 + e.y1) / 2], wd = (e.ax === 'y' ? e.x1 - e.x0 : e.y1 - e.y0) / 2;
+    const wx = q.x + m[0] * ca - m[1] * sa - it.x, wy = q.y + m[0] * sa + m[1] * ca - it.y, x = wx * cb - wy * sb, y = wx * sb + wy * cb;
+    if (Math.abs(x + hw) < .3 && Math.abs(y) < hd) out.l.push([y - wd, y + wd]);
+    else if (Math.abs(x - hw) < .3 && Math.abs(y) < hd) out.r.push([y - wd, y + wd]);
+    else if (Math.abs(y - hd) < .3 && Math.abs(x) < hw) out.f.push([x - wd, x + wd]);
+  });
+  return out;
+}
+const railRuns = (a, b, gs) => { let o = [[a, b]]; gs.forEach(g => { o = o.flatMap(r => g[1] <= r[0] || g[0] >= r[1] ? [r] : [[r[0], Math.max(r[0], g[0])], [Math.min(r[1], g[1]), r[1]]]); }); return o.filter(r => r[1] - r[0] > .08); };
 
 // ================================================================= 3D
 const view = $('view3d');
@@ -374,7 +394,7 @@ function buildWall3(g, w, M, hl) {
 }
 
 // item builders work in local coords: x across (w), y along (d), z up from the item's floor level
-function buildItem3(parent, it, M, hl) {
+function buildItem3(parent, it, M, hl, St) {
   if (it.st === 'demo' && !hl) return;
   const g = new THREE.Group(), base = it.f ? L1 : 0; parent.add(g);
   const ghost = it.st === 'demo';
@@ -400,7 +420,7 @@ function buildItem3(parent, it, M, hl) {
     const post = (x, y, z) => B(x - 0.02, x + 0.02, y - 0.02, y + 0.02, z, z + 0.95, M.rail);
     G.ld.forEach(q => {
       const zt = z0 + (q.k + 1) * rise; B(q.x0, q.x1, q.y0, q.y1, z0, zt, M.stair);
-      [[q.x0 + .03, q.y0, q.x0 + .03, q.y1 - .03, Math.abs(q.x0 + G.hw) < .01], [q.x1 - .03, q.y0, q.x1 - .03, q.y1 - .03, Math.abs(q.x1 - G.hw) < .01], [q.x0 + .03, q.y1 - .03, q.x1 - .03, q.y1 - .03, true]]
+      [[q.x0 + .03, q.y0, q.x0 + .03, q.y1 - .03, Math.abs(q.x0 + G.hw) < .01], [q.x1 - .03, q.y0, q.x1 - .03, q.y1 - .03, Math.abs(q.x1 - G.hw) < .01], [q.x0 + .03, q.y1 - .03, q.x1 - .03, q.y1 - .03, !q.mid]]
         .forEach(e => { if (!e[4]) return; bar([e[0], e[1], zt + .95], [e[2], e[3], zt + .95]); post(e[0], e[1], zt); post(e[2], e[3], zt); });
     });
     G.fl.forEach(q => {
@@ -414,14 +434,13 @@ function buildItem3(parent, it, M, hl) {
     });
   } else if (t === 'balcony') {
     B(-hw, hw, -hd, hd, -0.2, 0, M.slab); B(-hw, hw, -hd, hd, 0, 0.02, M.pave);
-    const rl = [[-hw, -hd], [-hw, hd], [hw, hd], [hw, -hd]];
-    for (let i = 0; i < 3; i++) {
-      const a = rl[i], b = rl[i + 1];
-      B(Math.min(a[0], b[0]) - 0.025, Math.max(a[0], b[0]) + 0.025, Math.min(a[1], b[1]) - 0.025, Math.max(a[1], b[1]) + 0.025, 0.95, 1.0, M.rail);
-      B(Math.min(a[0], b[0]) - 0.015, Math.max(a[0], b[0]) + 0.015, Math.min(a[1], b[1]) - 0.015, Math.max(a[1], b[1]) + 0.015, 0.5, 0.53, M.rail);
-    }
-    for (let x = -hw; x <= hw + 0.01; x += w / Math.max(1, Math.round(w / 0.9))) B(x - 0.02, x + 0.02, hd - 0.02, hd + 0.02, 0, 0.95, M.rail);
-    for (let y = -hd; y <= hd + 0.01; y += d / Math.max(1, Math.round(d / 0.9))) { B(-hw - 0.02, -hw + 0.02, y - 0.02, y + 0.02, 0, 0.95, M.rail); B(hw - 0.02, hw + 0.02, y - 0.02, y + 0.02, 0, 0.95, M.rail); }
+    const gp = St ? railGaps(St, it) : { l: [], f: [], r: [] };
+    const run = (r, P) => {          // one railing stretch between r[0] and r[1]; P maps the position along the side to local x,y
+      const a = P(r[0]), b = P(r[1]), x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+      B(x0 - 0.025, x1 + 0.025, y0 - 0.025, y1 + 0.025, 0.95, 1.0, M.rail); B(x0 - 0.015, x1 + 0.015, y0 - 0.015, y1 + 0.015, 0.5, 0.53, M.rail);
+      const n = Math.max(1, Math.round((r[1] - r[0]) / 0.9)); for (let i = 0; i <= n; i++) { const q = P(r[0] + (r[1] - r[0]) * i / n); B(q[0] - 0.02, q[0] + 0.02, q[1] - 0.02, q[1] + 0.02, 0, 0.95, M.rail); }
+    };
+    railRuns(-hd, hd, gp.l).forEach(r => run(r, u => [-hw, u])); railRuns(-hd, hd, gp.r).forEach(r => run(r, u => [hw, u])); railRuns(-hw, hw, gp.f).forEach(r => run(r, u => [u, hd]));
     if (it.f) [-hw + 0.1, hw - 0.1].forEach(x => B(x - 0.1, x + 0.1, hd - 0.2, hd, -L1 - 0.2, -0.2, M.wall));
   } else if (t === 'pergola') {
     const ph = it.h || 2.4;
@@ -485,7 +504,7 @@ function buildUnit(St, sx, M, hl, withLabels) {
     if (bm.mode === 'rect') for (let i = 0; i < rl.length - 1; i++) { const a = rl[i], c = rl[i + 1], n = Math.round(Math.hypot(c[0] - a[0], c[1] - a[1]) / 0.9); for (let j = 1; j < n; j++) { const x = a[0] + (c[0] - a[0]) * j / n, y = a[1] + (c[1] - a[1]) * j / n; box(gU, x - 0.02, x + 0.02, y - 0.02, y + 0.02, L1, L1 + 0.95, M.rail); } }
   } else if (hl) { slab(gU, balc, 3.03, 0.05, M.ghost); }
   St.walls.forEach(w => buildWall3(w.f ? gU : gG, w, M, hl));
-  St.items.forEach(it => buildItem3(it.f ? gU : gG, it, M, hl));
+  St.items.forEach(it => buildItem3(it.f ? gU : gG, it, M, hl, St));
   if (withLabels) [0, 1].forEach(f => { const rs = St.rooms.filter(r => r.f === f), ra = roomAreas(St, f, rs); rs.forEach(r => { const a = ra.get(r.id).a; sprite(f ? labU : labG, r.name, r.x * sx, r.y, (f ? L1 : 0) + 1.5, 1, a ? a.toFixed(1) + ' מ"ר' : ''); }); });
   root.traverse(o => { if (o.isMesh) { o.castShadow = o.material !== M.ghost; o.receiveShadow = true; } });
   return { root, gG, gU, gR, labG, labU };
@@ -579,6 +598,10 @@ function drawPlan(St, f, o) {
       const pp = G.path, a = pp[pp.length - 2], b = pp[pp.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
       const h1 = [b[0] - ux * .25 - uy * .15, b[1] - uy * .25 + ux * .15], h2 = [b[0] - ux * .25 + uy * .15, b[1] - uy * .25 - ux * .15];
       s += `<path d="M${pp.map(q => F(q[0]) + ' ' + F(-q[1])).join(' L')} M${F(h1[0])} ${F(-h1[1])} L${F(b[0])} ${F(-b[1])} L${F(h2[0])} ${F(-h2[1])}" fill="none" stroke="${stroke}" stroke-width=".04" pointer-events="none"/>`;
+    }
+    if (it.type === 'balcony') {
+      const gp = railGaps(St, it), gl = (x1, y1, x2, y2) => `<line x1="${F(x1)}" y1="${F(-y1)}" x2="${F(x2)}" y2="${F(-y2)}" stroke="#fff" stroke-width=".1" pointer-events="none"/><circle cx="${F(x1)}" cy="${F(-y1)}" r=".045" fill="${stroke}"/><circle cx="${F(x2)}" cy="${F(-y2)}" r=".045" fill="${stroke}"/>`;
+      gp.l.forEach(r => s += gl(-hw, r[0], -hw, r[1])); gp.r.forEach(r => s += gl(hw, r[0], hw, r[1])); gp.f.forEach(r => s += gl(r[0], hd, r[1], hd));
     }
     if (it.type === 'stairsInt') { for (let i = 1; i < 9; i++) { const x = hw - 0.235 * i; s += `<line x1="${F(x)}" x2="${F(x)}" y1="0.05" y2="${F(hd)}" stroke="${stroke}" stroke-width=".02"/>`; const x2 = -hw + 1.2 + 0.195 * i; s += `<line x1="${F(x2)}" x2="${F(x2)}" y1="${F(-hd)}" y2="-0.05" stroke="${stroke}" stroke-width=".02"/>`; } s += `<line x1="${F(-hw + 1.2)}" x2="${F(hw)}" y1="0" y2="0" stroke="${stroke}" stroke-width=".04"/>`; }
     if (it.type === 'pergola') { const n = Math.max(2, Math.round(it.w / 0.4)); for (let i = 1; i < n; i++) { const x = -hw + it.w * i / n; s += `<line x1="${F(x)}" x2="${F(x)}" y1="${F(-hd)}" y2="${F(hd)}" stroke="${stroke}" stroke-width=".02" stroke-dasharray=".1 .06"/>`; } }
@@ -826,16 +849,18 @@ function renderProps() {
     if (!D.fixed && ob.type !== 'column') h += `<button data-act="lk">${ob.lock ? 'שחרר נעילה' : 'נעל במקום'}</button>`;
     if (ob.type === 'stairsExt') {
       const sh = ob.shape || 'I', op = (v, t, c) => `<option value="${v}" ${c === v ? 'selected' : ''}>${t}</option>`;
-      h += `<label>צורה<select data-act="ss">${op('I', 'ישרות', sh)}${op('L', 'פנייה 90° (ר)', sh)}${op('U', 'פנייה 180° (ח)', sh)}</select></label>`;
-      if (sh !== 'I') h += `<label>כיוון פנייה<select data-act="sd">${op('r', 'ימינה', ob.turn || 'r')}${op('l', 'שמאלה', ob.turn || 'r')}</select></label>` + num('רוחב מהלך ס"מ', 'isw', cm(stairGeo(ob).sw), 'min="60" step="5"');
+      h += `<label>צורה<select data-act="ss">${op('I', 'ישרות', sh)}${op('P', 'ישרות + פודסט', sh)}${op('L', 'פנייה 90° (ר)', sh)}${op('U', 'פנייה 180° (ח)', sh)}</select></label>`;
+      if (sh === 'P') h += num('אורך פודסט ס"מ', 'ilp', cm(ob.lp || 1), 'min="60" step="5"');
+      if (sh === 'L' || sh === 'U') h += `<label>כיוון פנייה<select data-act="sd">${op('r', 'ימינה', ob.turn || 'r')}${op('l', 'שמאלה', ob.turn || 'r')}</select></label>` + num('רוחב מהלך ס"מ', 'isw', cm(stairGeo(ob).sw), 'min="60" step="5"');
       h += num('גובה יעד ס"מ', 'ih', cm(ob.h || L1), 'step="5"');
     }
     if (ob.type !== 'column') h += `<button data-act="del" class="${ob.st === 'demo' ? '' : 'danger'}">${ob.st === 'new' ? 'מחק' : ob.st === 'demo' ? 'בטל הסרה' : 'הסרה / פירוק'}</button>`;
     h += '</div>';
     if (ob.type === 'stairsExt') {
       const G = stairGeo(ob), go = G.fl.map(q => (q.go * 100).toFixed(1)), bad = G.fl.some(q => q.go < .25);
-      h += `<div class="hint">${G.n} רומים · רום ${(G.rise * 100).toFixed(1)} ס"מ · שלח ${go.join(' / ')} ס"מ${G.ld.length ? ' · משטח ביניים (פודסט) ' + cm(G.sw) + ' ס"מ' : ''}. המדרגות עולות לכיוון החץ. שינוי רוחב / עומק הפריט משנה את אורך המהלכים.</div>` + (bad ? '<div class="warn">שלח קטן מ-25 ס"מ - הגדילו את עומק / רוחב הפריט (תקן: רום עד 17.5, שלח 26 לפחות).</div>' : '');
+      h += `<div class="hint">${G.n} רומים · רום ${(G.rise * 100).toFixed(1)} ס"מ · שלח ${go.join(' / ')} ס"מ${G.ld.length ? ' · משטח ביניים (פודסט) ' + cm(G.ld[0].mid ? G.ld[0].y1 - G.ld[0].y0 : G.sw) + ' ס"מ' : ''}. המדרגות עולות לכיוון החץ. שינוי רוחב / עומק הפריט משנה את אורך המהלכים.</div>` + (bad ? '<div class="warn">שלח קטן מ-25 ס"מ - הגדילו את עומק / רוחב הפריט (תקן: רום עד 17.5, שלח 26 לפחות).</div>' : '');
     }
+    if (ob.type === 'balcony') { const gp = railGaps(S, ob), n = gp.l.length + gp.f.length + gp.r.length; h += `<div class="hint">${n ? 'פתח במעקה: נפתח אוטומטית מול ראש המדרגות החיצוניות (' + cm(Math.max(...gp.l.concat(gp.f, gp.r).map(r => r[1] - r[0]))) + ' ס"מ). הזזת המדרגות מזיזה את הפתח.' : 'פתח במעקה ייפתח אוטומטית כשראש מדרגות חיצוניות ייצמד לשפת המרפסת.'}</div>`; }
     if (ob.type === 'stairsInt') h += '<div class="hint">פירוק המדרגות סוגר את הפתח בתקרה (הפרדה בין הדירות).</div>';
   } else {
     h += `<b>חדר / ייעוד</b><div class="row"><label>שם<input list="roomList" data-act="rn" value="${esc(ob.name)}" ${ob.lock ? 'disabled' : ''}></label>${ob.lock ? '<span class="warn">ממ"ד - ייעוד קבוע</span>' : '<button data-act="del" class="danger">מחק תווית</button>'}</div>`;
@@ -848,11 +873,12 @@ $('props').addEventListener('change', e => {
   const a = e.target.dataset.act, ob = find(); if (!a || !ob) return; const val = parseFloat(e.target.value);
   if (sel.k === 'balc') { if (isNaN(val)) return; if (a === 'bw') ob.w = Math.max(1, Math.min(9, val / 100)); if (a === 'bd') ob.d = Math.max(.8, Math.min(6, val / 100)); return commit(); }
   if (a === 'ss') {
-    const v = e.target.value, sw = Math.min(1.5, ob.shape && ob.shape !== 'I' ? (ob.sw || 1) : ob.w); ob.shape = v; ob.sw = r2(sw);
-    if (v === 'I') { ob.w = ob.sw; ob.d = 4.6; } else if (v === 'L') { ob.w = r2(ob.sw + 2.35); ob.d = r2(ob.sw + 2.35); } else { ob.w = r2(ob.sw * 2 + .1); ob.d = r2(ob.sw + 2.35); }
+    const v = e.target.value, sw = Math.min(1.5, ob.shape === 'L' || ob.shape === 'U' ? (ob.sw || 1) : ob.w); ob.shape = v; ob.sw = r2(sw);
+    if (v === 'I') { ob.w = ob.sw; ob.d = 4.6; } else if (v === 'P') { ob.w = ob.sw; ob.d = 5.86; } else if (v === 'L') { ob.w = r2(ob.sw + 2.35); ob.d = r2(ob.sw + 2.35); } else { ob.w = r2(ob.sw * 2 + .1); ob.d = r2(ob.sw + 2.35); }
     return commit();
   }
   if (a === 'sd') { ob.turn = e.target.value; return commit(); }
+  if (a === 'ilp') { if (isNaN(val)) return; ob.lp = Math.max(.6, Math.min(2, val / 100)); return commit(); }
   if (a === 'rn') ob.name = e.target.value.trim() || ob.name;
   else if (isNaN(val)) return;
   else if (a === 'wlen') { const v = wv(ob), L = Math.max(.1, val / 100); ob.b = [r2(ob.a[0] + v.ux * L), r2(ob.a[1] + v.uy * L)]; }
@@ -943,7 +969,7 @@ function makeSheets() {
   const P = p => `${cm(p[0])},${cm(p[1])}`, row = c => '<tr>' + c.map(x => `<td>${x}</td>`).join('') + '</tr>';
   const wt = st => { let tl = 0, ta = 0; const rows = S.walls.filter(w => w.st === st && !w.curve).map((w, i) => { const L = wv(w).L, A = L * wallH(w); tl += L; ta += A; return row([i + 1, fl[w.f], WK[w.k], P(w.a), P(w.b), cm(L), cm(w.t), cm(wallH(w)), A.toFixed(2)]); }); const bw = S.walls.filter(w => w.curve && w.st === st); if (bw.length) { const L = bw.reduce((t, w) => t + wv(w).L, 0), A = L * HG; tl += L; ta += A; rows.push(row([rows.length + 1, fl[0], 'קיר מעוגל R140', P(BAY_A), P(BAY_B), cm(L), 20, cm(HG), A.toFixed(2)])); } return rows.length ? `<table class="sc"><tr><th>#</th><th>קומה</th><th>סוג</th><th>מנקודה X,Y</th><th>עד נקודה X,Y</th><th>אורך</th><th>עובי</th><th>גובה</th><th>שטח מ"ר</th></tr>${rows.join('')}<tr class="sum"><td colspan="5">סה"כ</td><td>${cm(tl)}</td><td></td><td></td><td>${ta.toFixed(2)}</td></tr></table>` : '<p class="none">אין</p>'; };
   const ops = []; S.walls.forEach(w => { if (w.st === 'demo') return; w.ops.forEach(o => { if (o.st !== 'exist') { const v = wv(w); ops.push(row([ops.length + 1, fl[w.f], WK[w.k], o.st === 'new' ? 'פתיחת ' + OPN[o.type] : 'סגירת ' + OPN[o.type], P(wp(w, v, o.s)), cm(o.w), cm(o.h), cm(o.sill)])); } }); });
-  const its = S.items.filter(i => i.st !== 'exist').map((i, k) => row([k + 1, fl[i.f], IT[i.type].n + (i.type === 'stairsExt' && i.shape === 'L' ? ' (פנייה 90°)' : i.type === 'stairsExt' && i.shape === 'U' ? ' (פנייה 180°)' : ''), i.st === 'new' ? 'חדש' : 'פירוק', cm(i.w) + ' × ' + cm(i.d), P([i.x, i.y]), (i.rot || 0) + '°']));
+  const its = S.items.filter(i => i.st !== 'exist').map((i, k) => row([k + 1, fl[i.f], IT[i.type].n + (i.type === 'stairsExt' && i.shape === 'P' ? ' (עם פודסט)' : i.type === 'stairsExt' && i.shape === 'L' ? ' (פנייה 90°)' : i.type === 'stairsExt' && i.shape === 'U' ? ' (פנייה 180°)' : ''), i.st === 'new' ? 'חדש' : 'פירוק', cm(i.w) + ' × ' + cm(i.d), P([i.x, i.y]), (i.rot || 0) + '°']));
   const bmS = balcOf(S); if (bmS.mode === 'rect') its.push(row([its.length + 1, fl[1], 'מרפסת מלבנית', 'חדש (במקום עגולה)', cm(bmS.w) + ' × ' + cm(bmS.d), P([4.5 + bmS.w / 2, 2.13 - bmS.d / 2]), '0°'])); if (bmS.mode !== 'round') its.push(row([its.length + 1, fl[1], 'מרפסת עגולה R140 + מעקה', 'פירוק', '370 × 220', P([6.35, 1.2]), '0°']));
   const warn = []; if (bmS.mode !== 'round') warn.push('שינוי מרפסת קומה א\' (צורה / מעקה / זיז) - מחייב תכנון קונסטרוקטיבי והיתר.');
   if (S.walls.some(w => w.k === 'ext' && (w.st === 'demo' || w.ops.some(o => o.st !== 'exist')))) warn.push('שינוי בקיר חיצוני / נושא - מחייב תכנון ואישור מהנדס קונסטרוקציה.');
